@@ -1,41 +1,10 @@
 - hosts: windows
-  vars:
-    # Install packages
-    package_list: 
-      - git
-      - googlechrome
-      - firefox
-      - atom
-      - winrar
-      - irfanview
-      - evernote
-      - transgui
-      - putty.install
-      - exiftool
-
-    # Where is our working path on windows 10 host  
-    working_path: 'c:\Temp\w10setup\'
-   
-    # password to elevate as test user
-    ansible_become_password: password   
   tasks:
     - name: Install packages
       win_chocolatey:
         name: "{{ item }}"
         state: present
-      with_items: "{{ package_list }}"
-
-    - name: Install treesize
-      win_chocolatey:
-        name: treesizefree
-        state: present
-        ignore_checksums: yes
-
-    - name: Install Adobe Reader
-      win_chocolatey:
-        name: "adobereader"
-        version: "11.0.10"
-        ignore_checksums: yes
+      with_items: "{{ var_choco_packages }}"
 
     - name: Create setup directory
       win_file:
@@ -44,10 +13,15 @@
 
     # Pull down initial setup script - move this to an actual role
     # ref https://github.com/Disassembler0/Win10-Initial-Setup-Script
-    - name: Download cleanup script to local linux host
+    - name: Download cleanup script to local linux host 1/2
       get_url:
         url: https://raw.githubusercontent.com/Disassembler0/Win10-Initial-Setup-Script/master/Win10.ps1
         dest: files/Win10.ps1
+      delegate_to: localhost
+    - name: Download cleanup script to local linux host 2/2
+      get_url:
+        url: https://raw.githubusercontent.com/Disassembler0/Win10-Initial-Setup-Script/master/Win10.psm1
+        dest: files/Win10.psm1
       delegate_to: localhost
 
     - name: Copy config file
@@ -58,9 +32,10 @@
       with_items:
         - preset.txt
         - Win10.ps1
+        - Win10.psm1
 
     - name: Run config removal script
-      win_shell: powershell.exe -NoProfile -ExecutionPolicy Bypass -File Win10.ps1 -preset preset.txt >> c:\Temp\w10setup\setup.log
+      win_shell: powershell.exe -NoProfile -ExecutionPolicy Bypass -File Win10.ps1 -include Win10.psm1 -preset preset.txt >> c:\Temp\w10setup\setup.log
       args:
         chdir: c:\Temp\w10setup
         creates: c:\Temp\w10setup\setup.log
@@ -80,7 +55,7 @@
         data: 1
       - name: HideFileExt
         data: 0
- 
+
     - name: Disable Web Search
       win_regedit:
         path: HKLM:\ANSIBLE\SOFTWARE\Microsoft\Windows\CurrentVersion\Search
@@ -98,49 +73,9 @@
     # Testing creating application shortcuts
     - name: Create an application shortcut for an executable in PATH to your desktop
       win_shortcut:
-        src: cmd.exe
-        dest: Desktop\Command prompt.lnk
+        src: powershell.exe
+        dest: Desktop\powershell.lnk
 
-    - name: Chrome Test
-      win_regedit:
-        path: HKLM:\ANSIBLE\SOFTWARE\Policies\Google\Chrome
-        name: "{{ item.name }}"
-        data: "{{ item.data }}"
-        type: "{{ item.type }}"
-        state: present
-        hive: C:\Users\Default\NTUSER.dat
-      loop:
-      - name: PasswordManagerEnabled
-        data: 0
-        type: dword
-      - name: RestoreOnStartup
-        data: 4
-        type: dword
-      - name: HomepageIsNewTabPage
-        data: 0
-        type: dword
-      - name: HomepageLocation
-        data: www.google.com
-        type: string
-      register: reboot
-
-    ## Create a user and run a script under that user
-    - name: Ensure testuser
-      win_user:
-        name: testuser
-        password: password
-        state: present
-        groups:
-          - Administrators
-
-    - name: Run config removal script as test user
-      win_shell: powershell.exe -NoProfile -ExecutionPolicy Bypass -File Win10.ps1 -preset preset.txt >> c:\Temp\w10setup\setup_testuser.log
-      args:
-        chdir: c:\Temp\w10setup
-        creates: c:\Temp\w10setup\setup_testuser.log
-      become_user: testuser
-      become_method: runas
-      become: yes
-    
-    - win_reboot: 
-      when: reboot.changed
+    - name: Install updates
+      ansible.windows.win_updates:
+        reboot: yes
