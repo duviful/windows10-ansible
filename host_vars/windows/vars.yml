@@ -1,0 +1,29 @@
+# ansible vars
+ansible_user: windows_user
+ansible_password: windows_password
+ansible_connection: winrm
+ansible_ssh_port: 5986
+ansible_winrm_server_cert_validation: ignore
+
+#chocolatey vars
+var_choco_packages: 
+      - 7zip
+      - adobereader
+      - discord
+      - epicgameslauncher
+      - firefox
+      - nvidia-display-driver
+      - steam
+      - goggalaxy
+      - treesizefree
+      - uplay
+      - vcredist140
+      - vcredist2010
+      - vcredist2013
+      - vcredist2015
+
+# Where is our working path on windows 10 host  
+working_path: 'c:\Temp\w10setup\'
+   
+# password to elevate as test user
+ansible_become_password: windows_password
